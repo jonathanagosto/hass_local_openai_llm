@@ -17,7 +17,6 @@ from homeassistant.const import CONF_API_KEY, CONF_LLM_HASS_API, CONF_MODEL, CON
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import SectionConfig, section
 from homeassistant.helpers import llm
-from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -29,7 +28,7 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TemplateSelector,
 )
-from openai import AsyncOpenAI, OpenAIError
+from openai import OpenAIError
 
 from custom_components.local_openai.entities.deepseek import (
     get_conversation_config_schema as _deepseek_conversation_schema,
@@ -44,9 +43,13 @@ from custom_components.local_openai.entities.llama_cpp import (
     get_model_alias as _llama_cpp_model_alias,
 )
 
+from . import _create_openai_client
 from .const import (
+    AUTH_SCHEME_BEARER,
+    AUTH_SCHEME_NO_PREFIX,
     CONF_AI_TASK_SUPPORTED_ATTRIBUTES,
     CONF_AI_TASK_TOOLS_SECTION,
+    CONF_AUTH_SCHEME,
     CONF_BASE_URL,
     CONF_CHAT_TEMPLATE_KWARGS,
     CONF_CHAT_TEMPLATE_OPTS,
@@ -193,6 +196,24 @@ class LocalAiConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_BASE_URL, default=""): str,
                 vol.Optional(CONF_API_KEY, default=""): str,
                 vol.Required(
+                    CONF_AUTH_SCHEME,
+                    default=AUTH_SCHEME_BEARER,
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        mode=SelectSelectorMode.DROPDOWN,
+                        options=[
+                            SelectOptionDict(
+                                value=AUTH_SCHEME_BEARER,
+                                label="Bearer",
+                            ),
+                            SelectOptionDict(
+                                value=AUTH_SCHEME_NO_PREFIX,
+                                label="None",
+                            ),
+                        ],
+                    ),
+                ),
+                vol.Required(
                     CONF_SERVER_TYPE,
                     default=SERVER_TYPE_GENERIC,
                 ): SelectSelector(
@@ -243,11 +264,7 @@ class LocalAiConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
             try:
-                client = AsyncOpenAI(
-                    base_url=user_input.get(CONF_BASE_URL),
-                    api_key=user_input.get(CONF_API_KEY, ""),
-                    http_client=get_async_client(self.hass),
-                )
+                client = _create_openai_client(self.hass, user_input)
 
                 LOGGER.debug("Retrieving model list to ensure server is accessible")
                 await client.models.list()
@@ -293,11 +310,7 @@ class LocalAiConfigFlow(ConfigFlow, domain=DOMAIN):
             )
 
             try:
-                client = AsyncOpenAI(
-                    base_url=user_input.get(CONF_BASE_URL),
-                    api_key=user_input.get(CONF_API_KEY, ""),
-                    http_client=get_async_client(self.hass),
-                )
+                client = _create_openai_client(self.hass, user_input)
 
                 LOGGER.debug("Retrieving model list to ensure server is accessible")
                 await client.models.list()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.components.conversation import DOMAIN as CONVERSATION_DOMAIN
@@ -14,11 +14,16 @@ from homeassistant.helpers.httpx_client import get_async_client
 from openai import AsyncOpenAI, AuthenticationError, OpenAIError
 
 if TYPE_CHECKING:
+    from types import MappingProxyType
+
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity import Entity
     from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    AUTH_SCHEME_BEARER,
+    AUTH_SCHEME_NO_PREFIX,
+    CONF_AUTH_SCHEME,
     CONF_BASE_URL,
     CONF_CHAT_TEMPLATE_KWARGS,
     CONF_CHAT_TEMPLATE_OPTS,
@@ -80,13 +85,39 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
+def _create_openai_client(
+    hass: HomeAssistant,
+    data: dict[str, Any] | MappingProxyType[str, Any],
+) -> AsyncOpenAI:
+    """Create an OpenAI client honouring the configured auth scheme."""
+    base_url = data[CONF_BASE_URL]
+    api_key = data.get(CONF_API_KEY, "")
+    scheme = data.get(CONF_AUTH_SCHEME, AUTH_SCHEME_BEARER)
+
+    client_kwargs: dict[str, Any] = {
+        "base_url": base_url,
+        "api_key": api_key,
+        "http_client": get_async_client(hass),
+    }
+
+    if scheme == AUTH_SCHEME_NO_PREFIX:
+        if api_key:
+            client_kwargs["default_headers"] = {"Authorization": api_key}
+        else:
+            # No key and no prefix -> allow unauthenticated requests.
+            client_kwargs["_enforce_credentials"] = False
+            client_kwargs["default_headers"] = {"Authorization": ""}
+    elif not api_key:
+        # Bearer with no key -> allow unauthenticated local requests.
+        client_kwargs["_enforce_credentials"] = False
+        client_kwargs["default_headers"] = {"Authorization": ""}
+
+    return AsyncOpenAI(**client_kwargs)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: LocalAiConfigEntry) -> bool:
     """Set up Local OpenAI LLM from a config entry."""
-    client = AsyncOpenAI(
-        base_url=entry.data[CONF_BASE_URL],
-        api_key=entry.data.get(CONF_API_KEY, ""),
-        http_client=get_async_client(hass),
-    )
+    client = _create_openai_client(hass, entry.data)
 
     # Cache current platform data which gets added to each request (caching done by library)
     _ = await hass.async_add_executor_job(client.platform_headers)

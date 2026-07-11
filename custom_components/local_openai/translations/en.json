@@ -7,10 +7,12 @@
           "server_name": "Server Name",
           "base_url": "Server URL",
            "api_key": "API key",
+          "auth_scheme": "Authorization scheme",
           "server_type": "Server Type"
         },
         "data_description": {
-          "api_key": "If required to authenticate with the service"
+          "api_key": "If required to authenticate with the service",
+          "auth_scheme": "Prefix used in the Authorization header; 'None' sends the API key without a prefix"
         },
         "sections": {
           "server_options": {
@@ -43,10 +45,12 @@
           "server_name": "Server Name",
           "base_url": "Server URL",
           "api_key": "API key",
+          "auth_scheme": "Authorization scheme",
           "server_type": "Server Type"
         },
         "data_description": {
-          "api_key": "If required to authenticate with the service"
+          "api_key": "If required to authenticate with the service",
+          "auth_scheme": "Prefix used in the Authorization header; 'None' sends the API key without a prefix"
         },
         "sections": {
           "server_options": {
